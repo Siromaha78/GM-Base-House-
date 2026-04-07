@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GM with Anna</title>
+<style>
+  #brick-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .brick {
+width: 50px;
+height: 25px;
+background: linear-gradient(145deg, #c96a4a, #8b3a2a);
+border: 1px solid #8b3a2a;
+border-radius: 4px;
+box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+margin-bottom: 5px;
+  }
+</style>
+</head>
+<body>
+
+<h2>🏠 GM Builder</h2>
+
+<button onclick="connectWallet()">🔌 Connect Wallet</button>
+<p id="wallet"></p>
+
+<button id="gm-button" onclick="sendGM()">🧱 GM (получить кирпич)</button>
+<div id="brick-area"></div>
+
+<p id="status">Streak: ...</p>
+
+<script src="./ethers.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

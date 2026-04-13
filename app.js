@@ -144,3 +144,8 @@ window.addEventListener("load", async () => {
 window.ethereum.on("chainChanged", () => {
   window.location.reload();
 });
+window.ethereum.on("accountsChanged", (accounts) => {
+  if (accounts.length > 0) {
+    window.location.reload();
+  }
+});

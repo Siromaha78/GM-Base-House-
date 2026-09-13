@@ -129,33 +129,34 @@ useEffect(() => {
 }, [nextFaucetTime, chainTimeOffset])
 
   async function getEthereumProvider() {
-    const isLocalhost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1'
-
-    if (isLocalhost && window.ethereum) {
-      setEnvironment('Browser / MetaMask fallback')
-      return window.ethereum
-    }
-
-    try {
-      const farcasterProvider = await sdk.wallet.getEthereumProvider()
-
-      if (farcasterProvider) {
-        setEnvironment('Farcaster Mini App wallet')
-        return farcasterProvider
-      }
-    } catch (error) {
-      console.log('Farcaster wallet not available:', error)
-    }
-
-    if (window.ethereum) {
-      setEnvironment('Browser / MetaMask fallback')
-      return window.ethereum
-    }
-
-    throw new Error('No Ethereum wallet found')
+  // Обычный браузер / MetaMask / injected wallet
+  if (window.ethereum) {
+    setEnvironment('Browser / injected wallet')
+    return window.ethereum
   }
+
+  // Настоящий Farcaster Mini App host
+  try {
+    const farcasterProvider = await Promise.race([
+      sdk.wallet.getEthereumProvider(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Farcaster wallet timeout')),
+          1500
+        )
+      ),
+    ])
+
+    if (farcasterProvider) {
+      setEnvironment('Farcaster Mini App wallet')
+      return farcasterProvider
+    }
+  } catch (error) {
+    console.log('Farcaster wallet not available:', error)
+  }
+
+  throw new Error('No Ethereum wallet found')
+}
   async function switchToBaseMainnet(ethProvider) {
   const baseMainnetChainId = '0x2105'
 

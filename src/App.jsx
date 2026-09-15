@@ -73,36 +73,61 @@ const alleyMode = phase === '5'
 
     initMiniApp()
   }, [])
-  useEffect(() => {
+ useEffect(() => {
   if (lastGMDay === null) return
 
-  const timer = setInterval(() => {
+  const updateGMStatus = () => {
     if (Number(lastGMDay) === 0) {
       setGmStatus('GM available now')
       return
     }
 
     const newCurrentGlobalDay = Math.floor(
-  (Date.now() / 1000 + chainTimeOffset) / 60
-)
-    const daysSinceLastGM = newCurrentGlobalDay - Number(lastGMDay)
+      (Date.now() / 1000 + chainTimeOffset) / 60
+    )
+
+    const daysSinceLastGM =
+      newCurrentGlobalDay - Number(lastGMDay)
 
     if (daysSinceLastGM === 0) {
-  setLastGMText('today')
-  setGmStatus("Already GM'd today")
-} else if (daysSinceLastGM === 1) {
-  setLastGMText('yesterday')
-  setGmStatus('GM available now')
-} else if (Number(freezes) > 0) {
-  setLastGMText(`${daysSinceLastGM} days ago`)
-  setGmStatus('Missed day — freeze can save your streak')
-} else {
-  setLastGMText(`${daysSinceLastGM} days ago`)
-  setGmStatus('Missed day — next GM will reset streak')
-}
-  }, 5000)
+      setLastGMText('today')
+      setGmStatus("Already GM'd today")
+    } else if (daysSinceLastGM === 1) {
+      setLastGMText('yesterday')
+      setGmStatus('GM available now')
+    } else if (Number(freezes) > 0) {
+      setLastGMText(`${daysSinceLastGM} days ago`)
+      setGmStatus('Missed day – freeze can save your streak')
+    } else {
+      setLastGMText(`${daysSinceLastGM} days ago`)
+      setGmStatus('Missed day – next GM will reset streak')
+    }
+  }
 
-  return () => clearInterval(timer)
+  updateGMStatus()
+
+  const timer = setInterval(updateGMStatus, 5000)
+
+  const handleVisibilityChange = () => {
+    if (!document.hidden) {
+      updateGMStatus()
+    }
+  }
+
+  window.addEventListener('focus', updateGMStatus)
+  document.addEventListener(
+    'visibilitychange',
+    handleVisibilityChange
+  )
+
+  return () => {
+    clearInterval(timer)
+    window.removeEventListener('focus', updateGMStatus)
+    document.removeEventListener(
+      'visibilitychange',
+      handleVisibilityChange
+    )
+  }
 }, [lastGMDay, freezes, chainTimeOffset])
 
 useEffect(() => {

@@ -317,7 +317,7 @@ if (Number(userLastGMDay) === 0) {
   readableGMStatus = 'GM available now'
 } else if (Number(availableFreezes) > 0) {
   readableLastGM = `${daysSinceLastGM} days ago`
-  readableGMStatus = 'Missed day — freeze can save your streak'
+  readableGMStatus = 'Missed day – freeze can save your streak'
 } else {
   readableLastGM = `${daysSinceLastGM} days ago`
   readableGMStatus = 'Missed day — next GM will reset streak'
@@ -698,7 +698,7 @@ Wallet
   </>
 )}
 
-{gmStatus === 'Missed day — freeze can save your streak' && (
+{gmStatus === 'Missed day – freeze can save your streak' && (
   <p className="warning">
     {alleyMode ? (
       <>

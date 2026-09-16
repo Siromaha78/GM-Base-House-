@@ -100,7 +100,7 @@ const alleyMode = phase === '5'
       setGmStatus('Missed day – freeze can save your streak')
     } else {
       setLastGMText(`${daysSinceLastGM} days ago`)
-      setGmStatus('Missed day – next GM will reset streak')
+      setGmStatus('Missed day - next GM will reset streak')
     }
   }
 
@@ -320,7 +320,7 @@ if (Number(userLastGMDay) === 0) {
   readableGMStatus = 'Missed day – freeze can save your streak'
 } else {
   readableLastGM = `${daysSinceLastGM} days ago`
-  readableGMStatus = 'Missed day — next GM will reset streak'
+  readableGMStatus = 'Missed day - next GM will reset streak'
 }
 
     console.log('UI UPDATE:', {
@@ -716,7 +716,7 @@ Wallet
   </p>
 )}
 
-{gmStatus === 'Missed day — next GM will reset streak' && (
+{gmStatus === 'Missed day - next GM will reset streak' && (
   <p className="warning">
     {alleyMode ? (
       <>

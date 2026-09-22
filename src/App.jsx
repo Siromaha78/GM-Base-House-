@@ -491,10 +491,7 @@ if (!refreshDone) {
 
       setStatus('Waiting for GM transaction...')
       const receipt = await gmTx.wait()
-      setAnnaBalance(prev =>
-  prev !== null ? String(Number(prev) - 1) : prev
-)
-
+      
 console.log(
   'Alchemy RPC loaded:',
   Boolean(import.meta.env.VITE_ALCHEMY_RPC_URL)

@@ -7,9 +7,9 @@ import phase2 from './assets/phase2.png'
 import phase3 from './assets/phase3.png'
 import phase4 from './assets/phase4.png'
 import phase5 from './assets/phase5.png'
-const GM_CONTRACT_ADDRESS = '0xe9017BD869E466Cb015894b09ac3B9d34ebF3313'
+const GM_CONTRACT_ADDRESS = '0x2652c9aA4ccef6107663f7F7BdB6C9aA938f67b3'
 
-const ANNA_TOKEN_ADDRESS = '0x8370EE2576a8825bF3784a2224C3855bFFfa0b07'
+const ANNA_TOKEN_ADDRESS = '0x0062386c34B1fF3165f989083673502152FE8b07'
 
 const GM_ABI = [
   'function currentStreak(address user) view returns (uint256)',
@@ -83,7 +83,7 @@ const alleyMode = phase === '5'
     }
 
     const newCurrentGlobalDay = Math.floor(
-      (Date.now() / 1000 + chainTimeOffset) / 60
+      (Date.now() / 1000 + chainTimeOffset) / 86400
     )
 
     const daysSinceLastGM =
@@ -296,7 +296,7 @@ try {
 const latestBlock = await provider.getBlock('latest')
     const offset = Number(latestBlock.timestamp) - Math.floor(Date.now() / 1000)
 setChainTimeOffset(offset)
-    const newCurrentGlobalDay = Math.floor(Number(latestBlock.timestamp) / 60)
+    const newCurrentGlobalDay = Math.floor(Number(latestBlock.timestamp) / 86400)
 
     const daysSinceLastGM =
       newCurrentGlobalDay - Number(userLastGMDay)
@@ -385,7 +385,7 @@ setLastGMText('')
   async function claimFaucet() {
     try {
       setIsLoading(true)
-      setStatus('Claiming 10 ANNA...')
+      setStatus('Claiming 10 HOUSE...')
 
       const ethProvider = await getEthereumProvider()
 
@@ -435,7 +435,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
 if (!refreshDone) {
   throw new Error('Post-faucet refresh failed after 3 attempts')
 }
-      setStatus('10 ANNA claimed')
+      setStatus('10 HOUSE claimed')
     } catch (error) {
       console.error(error)
       setStatus(`Faucet failed: ${error.shortMessage || error.message}`)
@@ -476,7 +476,7 @@ if (!refreshDone) {
       )
 
       if (allowance < gmPrice) {
-        setStatus('Approving ANNA for GM...')
+        setStatus('Approving HOUSE for GM...')
         const approveTx = await annaToken.approve(
           GM_CONTRACT_ADDRESS,
           ethers.MaxUint256

@@ -1,0 +1,31 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "GM, Base House!",
+    "iconUrl": "https://gm-base-house.vercel.app/icon.png",
+    "homeUrl": "https://gm-base-house.vercel.app",
+    "subtitle": "Build your cozy house on Base",
+    "description": "Build your own house one GM at a time. Keep your streak, earn repair trowels, complete all 4 building stages in 60 days, then grow your garden on Base.",
+    "primaryCategory": "games",
+    "tags": [
+  "streak",
+  "onchain",
+  "casual",
+  "building",
+  "daily"
+],
+"tagline": "Build daily. Grow forever.",
+    "heroImageUrl": "https://gm-base-house.vercel.app/hero.png",
+    "ogTitle": "GM, Base House!",
+    "ogDescription": "Build your house one GM at a time, keep your streak, then grow your garden on Base.",
+    "ogImageUrl": "https://gm-base-house.vercel.app/hero.png",
+    "splashImageUrl": "https://gm-base-house.vercel.app/splash.png",
+    "splashBackgroundColor": "#DEE1E7",
+    "requiredChains": [
+  "eip155:8453"
+],
+"requiredCapabilities": [
+  "wallet.getEthereumProvider"
+]
+  }
+}

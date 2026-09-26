@@ -1,4 +1,9 @@
 {
+    "accountAssociation": {
+  "header": "eyJmaWQiOjI4Mjg4NDYsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg5OTA1NTlDMEYwRkYxOUY5REQ3NTg0ZjdhMDUwYzE4MDUyMEUyNWEwIn0",
+  "payload": "eyJkb21haW4iOiJnbS1iYXNlLWhvdXNlLnZlcmNlbC5hcHAifQ",
+  "signature": "w7bgQ0P3DyEWJHnQw6zwnbDPc+x6zRUBiqmJQ9UxL50FPfT9BL89v0bMmCzMTyYXANHn4h327sKQZXufagtQDxw="
+},
   "miniapp": {
     "version": "1",
     "name": "GM, Base House!",

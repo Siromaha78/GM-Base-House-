@@ -153,35 +153,44 @@ useEffect(() => {
   return () => clearInterval(timer)
 }, [nextFaucetTime, chainTimeOffset])
 
-  async function getEthereumProvider() {
-  // Обычный браузер / MetaMask / injected wallet
+ async function getEthereumProvider() {
+  let inMiniApp = false
+
+  try {
+    inMiniApp = await Promise.race([
+      sdk.isInMiniApp(),
+      new Promise((resolve) =>
+        setTimeout(() => resolve(false), 2000)
+      ),
+    ])
+  } catch (error) {
+    console.log('Mini App detection failed:', error)
+  }
+
+  if (inMiniApp) {
+    const farcasterProvider = await sdk.wallet.getEthereumProvider()
+
+    if (!farcasterProvider) {
+      throw new Error('Farcaster wallet provider not available')
+    }
+
+    setEnvironment('Farcaster Mini App wallet')
+    return farcasterProvider
+  }
+
+  if (window.coinbaseWalletExtension) {
+    setEnvironment('Coinbase / Base wallet')
+    return window.coinbaseWalletExtension
+  }
+
   if (window.ethereum) {
     setEnvironment('Browser / injected wallet')
     return window.ethereum
   }
 
-  // Настоящий Farcaster Mini App host
-  try {
-    const farcasterProvider = await Promise.race([
-      sdk.wallet.getEthereumProvider(),
-      new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Farcaster wallet timeout')),
-          1500
-        )
-      ),
-    ])
-
-    if (farcasterProvider) {
-      setEnvironment('Farcaster Mini App wallet')
-      return farcasterProvider
-    }
-  } catch (error) {
-    console.log('Farcaster wallet not available:', error)
-  }
-
-  throw new Error('No Ethereum wallet found')
+  throw new Error('No Ethereum wallet provider found')
 }
+
   async function switchToBaseMainnet(ethProvider) {
   const baseMainnetChainId = '0x2105'
 
@@ -374,7 +383,11 @@ if (faucetNextTime !== null) {
       setAddress(userAddress)
       setNetworkName(`${network.name} / chainId ${network.chainId}`)
 setLastGMText('')
-      await refreshUserData(provider, userAddress)
+     const readProvider = new ethers.JsonRpcProvider(
+  import.meta.env.VITE_ALCHEMY_RPC_URL
+)
+
+await refreshUserData(readProvider, userAddress)
 
       setStatus('Wallet connected')
     } catch (error) {
@@ -401,16 +414,26 @@ setLastGMText('')
         signer
       )
 
-      const tx = await gmContract.faucet()
+     const tx = await gmContract.faucet({
+  gasLimit: 200000
+})
 setStatus('Waiting for faucet transaction...')
-
-const receipt = await tx.wait()
-
-const userAddress = await signer.getAddress()
 
 const readProvider = new ethers.JsonRpcProvider(
   import.meta.env.VITE_ALCHEMY_RPC_URL
 )
+
+const receipt = await readProvider.waitForTransaction(
+  tx.hash,
+  1,
+  120000
+)
+
+if (!receipt) {
+  throw new Error('Transaction confirmation timed out')
+}
+
+const userAddress = await signer.getAddress()
 
 let refreshDone = false
 
@@ -470,27 +493,64 @@ if (!refreshDone) {
       )
 
       const gmPrice = ethers.parseUnits('1', 18)
-      const allowance = await annaToken.allowance(
-        userAddress,
-        GM_CONTRACT_ADDRESS
-      )
+ const allowanceReadProvider = new ethers.JsonRpcProvider(
+  import.meta.env.VITE_ALCHEMY_RPC_URL
+)
+
+const annaTokenRead = new ethers.Contract(
+  ANNA_TOKEN_ADDRESS,
+  ANNA_ABI,
+  allowanceReadProvider
+)
+
+const allowance = await annaTokenRead.allowance(
+  userAddress,
+  GM_CONTRACT_ADDRESS
+)
 
       if (allowance < gmPrice) {
         setStatus('Approving HOUSE for GM...')
-        const approveTx = await annaToken.approve(
-          GM_CONTRACT_ADDRESS,
-          ethers.MaxUint256
-        )
+ const approveTx = await annaToken.approve(
+  GM_CONTRACT_ADDRESS,
+  ethers.MaxUint256,
+  { gasLimit: 200000 }
+)
 
         setStatus('Waiting for approve transaction...')
-        await approveTx.wait()
+        const approveReadProvider = new ethers.JsonRpcProvider(
+  import.meta.env.VITE_ALCHEMY_RPC_URL
+)
+
+const approveReceipt = await approveReadProvider.waitForTransaction(
+  approveTx.hash,
+  1,
+  120000
+)
+
+if (!approveReceipt) {
+  throw new Error('Approve confirmation timed out')
+}
       }
 
       setStatus('Sending GM...')
-      const gmTx = await gmContract.gm()
+const gmTx = await gmContract.gm({
+  gasLimit: 200000
+})
 
       setStatus('Waiting for GM transaction...')
-      const receipt = await gmTx.wait()
+      const gmReadProvider = new ethers.JsonRpcProvider(
+  import.meta.env.VITE_ALCHEMY_RPC_URL
+)
+
+const receipt = await gmReadProvider.waitForTransaction(
+  gmTx.hash,
+  1,
+  120000
+)
+
+if (!receipt) {
+  throw new Error('GM confirmation timed out')
+}
       
 console.log(
   'Alchemy RPC loaded:',
@@ -597,14 +657,18 @@ Wallet
 }
 >
   {gmStatus === "Already GM'd today" ? (
-    <>
-      ✅
-      <br />
-      Already
-      <br />
-      GM'd today😉
-    </>
-  ) : (
+  <>
+    ✅
+    <br />
+    Already
+    <br />
+    GM'd
+    <br />
+    today
+    <br />
+    😉
+  </>
+) : (
   <>
   <span className="button-emoji gm-emoji">☺️</span>
   <br />
@@ -625,7 +689,6 @@ Wallet
  {canClaimFaucet === false ? (
   <>
     <span className="button-emoji">🚚</span>
-    <br />
     New
     <br />
     shipment

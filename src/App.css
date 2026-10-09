@@ -276,10 +276,12 @@ button:disabled {
 }
 
 .app {
+  width: 100%;
   max-width: 420px;
   margin: 0 auto;
   padding: 24px;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .button-row {
@@ -322,6 +324,35 @@ button:disabled {
   font-size: 30px;
 
   font-weight: 800;
+}
+
+@media (max-width: 380px) {
+  .app {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .button-row {
+    display: grid;
+    grid-template-columns: 5fr 9fr 5fr;
+    gap: 8px;
+  }
+
+  .button-row button {
+    width: 100%;
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .button-row button:nth-child(2) {
+    min-width: 0;
+  }
+
+  .button-row button:nth-child(2):disabled {
+    font-size: 18px;
+    line-height: 1.1;
+  }
 }
 
 .subtitle {

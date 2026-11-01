@@ -51,6 +51,37 @@ function App() {
   const [walletChooserOpen, setWalletChooserOpen] = useState(false)
   const chosenWalletProvider = useRef(null)
 
+  useEffect(() => {
+    const wallet = chosenWalletProvider.current
+    if (!address || typeof wallet?.on !== 'function') return
+
+    const handleAccountsChanged = (accounts) => {
+      if (accounts?.[0]?.toLowerCase() === address.toLowerCase()) {
+        return
+      }
+
+      setAddress('')
+      setNetworkName('')
+      setStreak(null)
+      setFreezes(null)
+      setCycleDay(null)
+      setPhase(null)
+      setLastGMDay(null)
+      setAnnaBalance(null)
+      setCanClaimFaucet(null)
+      setNextFaucetTime(null)
+      setGmStatus('')
+      setLastGMText('')
+      setStatus('Wallet account changed. Please reconnect.')
+    }
+
+    wallet.on('accountsChanged', handleAccountsChanged)
+
+    return () => {
+      wallet.removeListener?.('accountsChanged', handleAccountsChanged)
+    }
+  }, [address])
+
   const houseImage =
     phase === '1'
       ? phase1
@@ -194,9 +225,33 @@ useEffect(() => {
     }
 
     // Older extensions may not implement EIP-6963.
-    add('Coinbase Wallet', window.coinbaseWalletExtension)
-    add('Injected wallet', window.ethereum)
-    add('OKX Wallet', window.okxwallet?.ethereum || window.okxwallet)
+    
+    const hasWallet = (name) =>
+      found.some((wallet) =>
+        wallet.name.toLowerCase().includes(name)
+      )
+
+    if (!hasWallet('coinbase')) {
+      add('Coinbase Wallet', window.coinbaseWalletExtension)
+    }
+
+    if (!hasWallet('okx')) {
+      add('OKX Wallet', window.okxwallet?.ethereum || window.okxwallet)
+    }
+
+    const injected = window.ethereum
+
+    if (injected) {
+      const isDuplicate =
+        (injected.isOkxWallet && hasWallet('okx')) ||
+        (injected.isCoinbaseWallet && hasWallet('coinbase')) ||
+        (injected.isMetaMask && hasWallet('metamask'))
+
+      if (!isDuplicate) {
+        add(injected.isMetaMask ? 'MetaMask' : 'Injected wallet', injected)
+      }
+    }
+
     return found
   }
 

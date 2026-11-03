@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { sdk } from '@farcaster/miniapp-sdk'
 import { ethers } from 'ethers'
 import './App.css'
@@ -47,6 +47,43 @@ function App() {
   const [lastGMText, setLastGMText] = useState('')
   const [chainTimeOffset, setChainTimeOffset] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [walletChoices, setWalletChoices] = useState([])
+  const [walletChooserOpen, setWalletChooserOpen] = useState(false)
+  const chosenWalletProvider = useRef(null)
+  const dataRequestId = useRef(0)
+
+  useEffect(() => {
+    const wallet = chosenWalletProvider.current
+    if (!address || typeof wallet?.on !== 'function') return
+
+    const handleAccountsChanged = (accounts) => {
+      if (accounts?.[0]?.toLowerCase() === address.toLowerCase()) {
+        return
+      }
+      dataRequestId.current += 1
+
+      setAddress('')
+      setNetworkName('')
+      setStreak(null)
+      setFreezes(null)
+      setCycleDay(null)
+      setPhase(null)
+      setLastGMDay(null)
+      setAnnaBalance(null)
+      setCanClaimFaucet(null)
+      setNextFaucetTime(null)
+      setGmStatus('')
+      setLastGMText('')
+      setStatus('Wallet account changed. Please reconnect.')
+    }
+
+    wallet.on('accountsChanged', handleAccountsChanged)
+
+    return () => {
+      wallet.removeListener?.('accountsChanged', handleAccountsChanged)
+    }
+  }, [address])
+
   const houseImage =
     phase === '1'
       ? phase1
@@ -153,43 +190,115 @@ useEffect(() => {
   return () => clearInterval(timer)
 }, [nextFaucetTime, chainTimeOffset])
 
- async function getEthereumProvider() {
-  let inMiniApp = false
-
-  try {
-    inMiniApp = await Promise.race([
-      sdk.isInMiniApp(),
-      new Promise((resolve) =>
-        setTimeout(() => resolve(false), 2000)
-      ),
-    ])
-  } catch (error) {
-    console.log('Mini App detection failed:', error)
+  async function isFarcasterMiniApp() {
+    try {
+      return await Promise.race([
+        sdk.isInMiniApp(),
+        new Promise((resolve) => setTimeout(() => resolve(false), 2000)),
+      ])
+    } catch (error) {
+      console.log('Mini App detection failed:', error)
+      return false
+    }
   }
 
-  if (inMiniApp) {
-    const farcasterProvider = await sdk.wallet.getEthereumProvider()
-
-    if (!farcasterProvider) {
-      throw new Error('Farcaster wallet provider not available')
+  // EIP-6963: extensions announce themselves in response to this event.
+  // Legacy providers are retained as fallbacks, not as an exclusive allowlist.
+  async function discoverBrowserWallets() {
+    const found = []
+    const add = (name, provider, uuid = null) => {
+      if (!provider || typeof provider.request !== 'function') return
+      if (found.some((wallet) => wallet.provider === provider || (uuid && wallet.uuid === uuid))) return
+      found.push({ name, provider, uuid })
     }
 
-    setEnvironment('Farcaster Mini App wallet')
-    return farcasterProvider
+    const onAnnouncement = (event) => {
+      const detail = event.detail
+      if (!detail?.info?.name || !detail?.provider) return
+      add(detail.info.name, detail.provider, detail.info.uuid)
+    }
+
+    window.addEventListener('eip6963:announceProvider', onAnnouncement)
+    try {
+      window.dispatchEvent(new Event('eip6963:requestProvider'))
+      await new Promise((resolve) => setTimeout(resolve, 350))
+    } finally {
+      window.removeEventListener('eip6963:announceProvider', onAnnouncement)
+    }
+
+    // Older extensions may not implement EIP-6963.
+    
+    const hasWallet = (name) =>
+      found.some((wallet) =>
+        wallet.name.toLowerCase().includes(name)
+      )
+
+    if (!hasWallet('coinbase')) {
+      add('Coinbase Wallet', window.coinbaseWalletExtension)
+    }
+
+    if (!hasWallet('okx')) {
+      add('OKX Wallet', window.okxwallet?.ethereum || window.okxwallet)
+    }
+
+    const injected = window.ethereum
+
+    if (injected) {
+      const isDuplicate =
+        (injected.isOkxWallet && hasWallet('okx')) ||
+        (injected.isCoinbaseWallet && hasWallet('coinbase')) ||
+        (injected.isMetaMask && hasWallet('metamask'))
+
+      if (!isDuplicate) {
+        add(injected.isMetaMask ? 'MetaMask' : 'Injected wallet', injected)
+      }
+    }
+
+    return found
   }
 
-  if (window.coinbaseWalletExtension) {
-    setEnvironment('Coinbase / Base wallet')
-    return window.coinbaseWalletExtension
+  async function getEthereumProvider() {
+    if (await isFarcasterMiniApp()) {
+      const farcasterProvider = await sdk.wallet.getEthereumProvider()
+      if (!farcasterProvider) {
+        throw new Error('Farcaster wallet provider not available')
+      }
+      setEnvironment('Farcaster Mini App wallet')
+      return farcasterProvider
+    }
+
+    if (chosenWalletProvider.current) {
+      setEnvironment('Browser / selected wallet')
+      return chosenWalletProvider.current
+    }
+
+    throw new Error('Choose a wallet before continuing')
   }
 
-  if (window.ethereum) {
-    setEnvironment('Browser / injected wallet')
-    return window.ethereum
+  async function startWalletConnection() {
+    try {
+      setStatus('Checking available wallets...')
+      if (await isFarcasterMiniApp()) {
+        await connectWallet()
+        return
+      }
+      const wallets = await discoverBrowserWallets()
+      if (!wallets.length) {
+        setStatus('No EVM wallet detected. Check extension permissions for this site.')
+        return
+      }
+      if (wallets.length === 1) {
+        await connectWallet(wallets[0].provider)
+        return
+      }
+      setWalletChoices(wallets)
+      setWalletChooserOpen(true)
+      setStatus('Choose a wallet to connect')
+    } catch (error) {
+      console.error(error)
+      setStatus(`Wallet connection failed: ${error.message}`)
+    }
   }
-
-  throw new Error('No Ethereum wallet provider found')
-}
 
   async function switchToBaseMainnet(ethProvider) {
   const baseMainnetChainId = '0x2105'
@@ -224,6 +333,7 @@ useEffect(() => {
 }
 
 async function refreshUserData(provider, userAddress, blockTag = undefined) {
+  const requestId = ++dataRequestId.current
     const gmContract = new ethers.Contract(
       GM_CONTRACT_ADDRESS,
       GM_ABI,
@@ -304,6 +414,12 @@ try {
 
 const latestBlock = await provider.getBlock('latest')
     const offset = Number(latestBlock.timestamp) - Math.floor(Date.now() / 1000)
+
+if (requestId !== dataRequestId.current) {
+  console.log('Ignoring outdated wallet data request:', requestId)
+  return false
+}
+
 setChainTimeOffset(offset)
     const newCurrentGlobalDay = Math.floor(Number(latestBlock.timestamp) / 86400)
 
@@ -363,10 +479,13 @@ if (faucetNextTime !== null) {
   setNextFaucetTime(Number(faucetNextTime))
 }
     setGmStatus(readableGMStatus)
+    return true
   }
 
-  async function connectWallet() {
+  async function connectWallet(selectedProvider = null) {
     try {
+      setWalletChooserOpen(false)
+      if (selectedProvider) chosenWalletProvider.current = selectedProvider
       setStatus('Connecting wallet...')
 
       const ethProvider = await getEthereumProvider()
@@ -387,7 +506,8 @@ setLastGMText('')
   import.meta.env.VITE_ALCHEMY_RPC_URL
 )
 
-await refreshUserData(readProvider, userAddress)
+const refreshed = await refreshUserData(readProvider, userAddress)
+if (!refreshed) return
 
       setStatus('Wallet connected')
     } catch (error) {
@@ -439,13 +559,16 @@ let refreshDone = false
 
 for (let attempt = 1; attempt <= 3; attempt++) {
   try {
-    await refreshUserData(
-      readProvider,
-      userAddress,
-      receipt.blockNumber
-    )
-    refreshDone = true
-    break
+    
+const refreshed = await refreshUserData(
+  readProvider,
+  userAddress,
+  receipt.blockNumber
+)
+if (!refreshed) return
+refreshDone = true
+break
+
   } catch (error) {
     console.warn(`Faucet refresh attempt ${attempt} failed`, error)
 
@@ -565,13 +688,16 @@ let refreshDone = false
 
 for (let attempt = 1; attempt <= 3; attempt++) {
   try {
-    await refreshUserData(
-      readProvider,
-      userAddress,
-      receipt.blockNumber
-    )
-    refreshDone = true
-    break
+    
+const refreshed = await refreshUserData(
+  readProvider,
+  userAddress,
+  receipt.blockNumber
+)
+if (!refreshed) return
+refreshDone = true
+break
+
   } catch (error) {
     console.warn(`Refresh attempt ${attempt} failed`, error)
 
@@ -581,8 +707,17 @@ for (let attempt = 1; attempt <= 3; attempt++) {
   }
 }
 
+
 if (!refreshDone) {
-  throw new Error('Post-GM refresh failed after 3 attempts')
+  if (receipt.status === 1) {
+    console.warn('GM confirmed, but UI refresh failed:', gmTx.hash)
+    setStatus(
+      'GM confirmed on Base, but progress could not be refreshed. Reopen the app. Do not send GM again.'
+    )
+    return
+  }
+
+  throw new Error('GM transaction was not successful')
 }
 
       setStatus('GM sent! Brick received.')
@@ -624,9 +759,46 @@ if (!refreshDone) {
         </div>
       )}
 
+       {walletChooserOpen && (
+         <div
+           role="presentation"
+           onClick={() => setWalletChooserOpen(false)}
+           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+         >
+           <div
+             role="dialog"
+             aria-modal="true"
+             aria-label="Choose a wallet"
+             onClick={(event) => event.stopPropagation()}
+             style={{ width: '100%', maxWidth: 320, padding: 20, borderRadius: 16, background: '#fff', color: '#222', boxShadow: '0 10px 35px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}
+           >
+             <h2 style={{ margin: '0 0 14px', fontSize: 20 }}>Choose your wallet</h2>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+               {walletChoices.map((wallet, index) => (
+                 <button
+                   key={wallet.uuid || index}
+                   type="button"
+                   onClick={() => connectWallet(wallet.provider)}
+                   style={{ width: '100%', minHeight: 46, fontSize: 16, borderRadius: 10, background: '#eef4ff', color: '#172b54', border: '1px solid #cbdcf7', cursor: 'pointer' }}
+                 >
+                   {wallet.name}
+                 </button>
+               ))}
+               <button
+                 type="button"
+                 onClick={() => setWalletChooserOpen(false)}
+                 style={{ width: '100%', minHeight: 38, border: 'none', background: 'transparent', color: '#555', cursor: 'pointer' }}
+               >
+                 Cancel
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+
       <div className="button-row">
        <button
-  onClick={connectWallet}
+  onClick={startWalletConnection}
   disabled={!!address}
 >
   {address ? (

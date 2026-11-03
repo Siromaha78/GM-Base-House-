@@ -50,6 +50,7 @@ function App() {
   const [walletChoices, setWalletChoices] = useState([])
   const [walletChooserOpen, setWalletChooserOpen] = useState(false)
   const chosenWalletProvider = useRef(null)
+  const dataRequestId = useRef(0)
 
   useEffect(() => {
     const wallet = chosenWalletProvider.current
@@ -59,6 +60,7 @@ function App() {
       if (accounts?.[0]?.toLowerCase() === address.toLowerCase()) {
         return
       }
+      dataRequestId.current += 1
 
       setAddress('')
       setNetworkName('')
@@ -331,6 +333,7 @@ useEffect(() => {
 }
 
 async function refreshUserData(provider, userAddress, blockTag = undefined) {
+  const requestId = ++dataRequestId.current
     const gmContract = new ethers.Contract(
       GM_CONTRACT_ADDRESS,
       GM_ABI,
@@ -411,6 +414,12 @@ try {
 
 const latestBlock = await provider.getBlock('latest')
     const offset = Number(latestBlock.timestamp) - Math.floor(Date.now() / 1000)
+
+if (requestId !== dataRequestId.current) {
+  console.log('Ignoring outdated wallet data request:', requestId)
+  return false
+}
+
 setChainTimeOffset(offset)
     const newCurrentGlobalDay = Math.floor(Number(latestBlock.timestamp) / 86400)
 
@@ -470,6 +479,7 @@ if (faucetNextTime !== null) {
   setNextFaucetTime(Number(faucetNextTime))
 }
     setGmStatus(readableGMStatus)
+    return true
   }
 
   async function connectWallet(selectedProvider = null) {
@@ -496,7 +506,8 @@ setLastGMText('')
   import.meta.env.VITE_ALCHEMY_RPC_URL
 )
 
-await refreshUserData(readProvider, userAddress)
+const refreshed = await refreshUserData(readProvider, userAddress)
+if (!refreshed) return
 
       setStatus('Wallet connected')
     } catch (error) {
@@ -548,13 +559,16 @@ let refreshDone = false
 
 for (let attempt = 1; attempt <= 3; attempt++) {
   try {
-    await refreshUserData(
-      readProvider,
-      userAddress,
-      receipt.blockNumber
-    )
-    refreshDone = true
-    break
+    
+const refreshed = await refreshUserData(
+  readProvider,
+  userAddress,
+  receipt.blockNumber
+)
+if (!refreshed) return
+refreshDone = true
+break
+
   } catch (error) {
     console.warn(`Faucet refresh attempt ${attempt} failed`, error)
 
@@ -674,13 +688,16 @@ let refreshDone = false
 
 for (let attempt = 1; attempt <= 3; attempt++) {
   try {
-    await refreshUserData(
-      readProvider,
-      userAddress,
-      receipt.blockNumber
-    )
-    refreshDone = true
-    break
+    
+const refreshed = await refreshUserData(
+  readProvider,
+  userAddress,
+  receipt.blockNumber
+)
+if (!refreshed) return
+refreshDone = true
+break
+
   } catch (error) {
     console.warn(`Refresh attempt ${attempt} failed`, error)
 
@@ -690,8 +707,17 @@ for (let attempt = 1; attempt <= 3; attempt++) {
   }
 }
 
+
 if (!refreshDone) {
-  throw new Error('Post-GM refresh failed after 3 attempts')
+  if (receipt.status === 1) {
+    console.warn('GM confirmed, but UI refresh failed:', gmTx.hash)
+    setStatus(
+      'GM confirmed on Base, but progress could not be refreshed. Reopen the app. Do not send GM again.'
+    )
+    return
+  }
+
+  throw new Error('GM transaction was not successful')
 }
 
       setStatus('GM sent! Brick received.')

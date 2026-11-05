@@ -31,10 +31,10 @@ const ANNA_ABI = [
 ]
 
 function App() {
-  const [status, setStatus] = useState('Ready to build on Base')
+  const [, setStatus] = useState('Ready to build on Base')
   const [address, setAddress] = useState('')
-  const [environment, setEnvironment] = useState('Checking environment...')
-  const [networkName, setNetworkName] = useState('')
+  const [, setEnvironment] = useState('Checking environment...')
+  const [, setNetworkName] = useState('')
   const [streak, setStreak] = useState(null)
   const [freezes, setFreezes] = useState(null)
   const [cycleDay, setCycleDay] = useState(null)
@@ -413,6 +413,8 @@ try {
 }
 
 const latestBlock = await provider.getBlock('latest')
+
+ // eslint-disable-next-line react-hooks/purity -- Clock time is read during an async refresh, not during render.
     const offset = Number(latestBlock.timestamp) - Math.floor(Date.now() / 1000)
 
 if (requestId !== dataRequestId.current) {
@@ -428,8 +430,8 @@ setChainTimeOffset(offset)
     console.log('userLastGMDay', Number(userLastGMDay))
     console.log('currentGlobalDay', newCurrentGlobalDay)
     console.log('daysSinceLastGM', daysSinceLastGM)
- let readableLastGM = 'Unknown'
-let readableGMStatus = 'GM available now'
+ let readableLastGM
+let readableGMStatus
 
 if (Number(userLastGMDay) === 0) {
   readableLastGM = 'never'
